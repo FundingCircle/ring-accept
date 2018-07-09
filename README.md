@@ -12,6 +12,7 @@ It allows Ring handlers to select the most appropriate content to output based o
 It implements [RFC 2616 sections 14.1–4](http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.1), including **wildcard and prefix matching** rules, client-side **q-values**, and server-side **source quality (qs) values**.
 
 [![CircleCI](https://circleci.com/gh/FundingCircle/ring-accept.svg?style=svg)](https://circleci.com/gh/FundingCircle/ring-accept)
+[![Clojars Project](https://img.shields.io/clojars/v/fundingcircle/ring-accept.svg)](https://clojars.org/fundingcircle/ring-accept)
 
 ## Installation
 
