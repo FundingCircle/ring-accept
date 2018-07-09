@@ -1,0 +1,21 @@
+version: 2
+jobs:
+  build:
+    docker:
+      - image: circleci/clojure:lein
+    working_directory: ~/ring-middleware
+    steps:
+      - checkout
+      - restore_cache:
+          key: ring-middleware-{{ checksum "project.clj" }}
+      - run: lein deps
+      - save_cache:
+          key: ring-middleware-{{ checksum "project.clj" }}
+          paths: ~/.m2
+      - run: lein test
+
+workflows:
+  version: 2
+  build:
+    jobs:
+      - build
