@@ -34,18 +34,18 @@
     :language {"accept-language" "en-gb,en"} ["en-gb" "en-us"] "en-gb"
     :language {"accept-language" "en-gb,en"} ["en-us" "en-gb"] "en-gb"
 
+    :encoding {} ["identity"] "identity"
     :encoding {"accept-encoding" "a"} ["a" :as :a] :a
     :encoding {"accept-encoding" "b"} ["a" :as :a] nil
     :encoding {"accept-encoding" "a,b;q=0.5"} ["a" :qs 0.1, "b"] "b"
     :encoding {"accept-encoding" "a;q=0.5,b"} ["a", "b" :qs 0.1] "a"
     :encoding {"accept-encoding" "a"} ["a" :qs 0] nil
-    :encoding {} ["identity"] "identity"
     :encoding {"accept-encoding" "a"} ["identity"] "identity"
     :encoding {"accept-encoding" "identity;q=0"} ["identity"] nil
     :encoding {"accept-encoding" "*;q=0"} ["identity"] nil
 
-    :charset {"accept-charset" "a;q=0.9"} ["iso-8859-1", "a"] "iso-8859-1"
     :charset {} ["iso-8859-1"] "iso-8859-1"
+    :charset {"accept-charset" "a;q=0.9"} ["iso-8859-1", "a"] "iso-8859-1"
     :charset {"accept-charset" "iso-8859-1;q=0"} ["iso-8859-1"] nil
     :charset {"accept-charset" "*;q=0"} ["iso-8859-1"] nil
     :charset {"accept-charset" ""} ["iso-8859-1"] "iso-8859-1"
