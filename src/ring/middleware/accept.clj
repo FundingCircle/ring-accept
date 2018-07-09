@@ -23,15 +23,20 @@
     (if (seq offered)
       (let
        [result (max-pos-key-multi offered
-                                  #(if-let [rule (most-applicable-rule (:name %))] (* (:qs % 1) (:q rule 0)) -1)
-                                  #(if-let [rule (most-applicable-rule (:name %))] (match-fn (:name %) (:name rule)) -1))]
-        (or (:as result) (:name result))))))
+                                  #(if-let [rule (most-applicable-rule (:name %))]
+                                     (* (:qs % 1) (:q rule 0)) -1)
+                                  #(if-let [rule (most-applicable-rule (:name %))]
+                                     (match-fn (:name %) (:name rule)) -1))]
+        (or (:as result)
+            (:name result))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defn- exact-match
   [cand pattern]
-  (if (or (= cand pattern) (= pattern "*")) 1 0))
+  (if (or (= cand pattern)
+          (= pattern "*"))
+    1 0))
 
 (defn- mime-match
   [cand pattern]
@@ -39,7 +44,7 @@
    (fn [s [c p]] (cond (= p "*") s (= c p) (* s 2) :else 0)) ; award points for exact match but not * match
    1
    (map vector
-        (clojure.string/split cand    #"/" 2)
+        (clojure.string/split cand #"/" 2)
         (clojure.string/split pattern #"/" 2))))
 
 (defn- lang-match
@@ -57,7 +62,7 @@
 
 (defn- lang-post
   "for all accepted langs xx-yy, also accept the parent lang xx with very low q-value unless already present
-	https://httpd.apache.org/docs/2.2/content-negotiation.html#exceptions"
+  https://httpd.apache.org/docs/2.2/content-negotiation.html#exceptions"
   [prefs]
   (reduce
    (fn [ps p] (if (not-any? #(= (:name %1) p) prefs) (conj ps {:name p :q 0.0009}) ps))
@@ -68,17 +73,17 @@
 
 (defn- charset-post
   "If no * is present in an Accept-Charset field, then [...] ISO-8859-1 [...] gets a quality value of 1 if not explicitly mentioned.
-	http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.2"
+
+  http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.2"
   [prefs]
-  (if (and
-       (not-any? #(= (:name %) "*") prefs)
-       (not-any? #(= (:name %) "iso-8859-1") prefs))
+  (if (and (not-any? #(= (:name %) "*") prefs)
+           (not-any? #(= (:name %) "iso-8859-1") prefs))
     (conj prefs {:name "iso-8859-1" :q 1})
     prefs))
 
 (defn- encoding-post
   "The identity content-coding is always acceptable, unless specifically refused
-	http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.3"
+  http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.3"
   [prefs]
   (if (and
        (not-any? #(= (:name %) "*") prefs)
@@ -102,23 +107,60 @@
   (loop [res [] cur {} [a b :as unprocessed] offered-list]
     (cond
       (empty? unprocessed)
-      (if (empty? cur) res (conj res cur))
+      (if (empty? cur)
+        res
+        (conj res cur))
+
       (some (partial = a) [:as :qs])
-      (recur res (assoc cur a b) (drop 2 unprocessed))
+      (recur res
+             (assoc cur a b)
+             (drop 2 unprocessed))
+
       :else
-      (recur (if (empty? cur) res (conj res cur)) {:name a} (rest unprocessed)))))
+      (recur (if (empty? cur) res (conj res cur))
+             {:name a}
+             (rest unprocessed)))))
+
+(defn- assoc-in-once [m k v]
+  (if (nil? (get-in m k))
+    (assoc-in m k v)
+    m))
+
+(defn find-header
+  "Looks up a header in a Ring response (or request) case insensitively,
+  returning the header map entry, or `not-found` (default `nil`) if no
+  matching header is present."
+  ([req-or-resp header-name]
+   (find-header req-or-resp header-name nil))
+  ([req-or-resp ^String header-name not-found]
+   (as-> req-or-resp %
+     (:headers %)
+     (filter #(.equalsIgnoreCase header-name (key %)) %)
+     (first %)
+     (or % not-found))))
+
+(defn get-header
+  "Looks up a header in a Ring response (or request) case insensitively,
+  returning the value of the header, or `not-found` (default `nil`) if
+  no matching header is present."
+  ([req-or-resp header-name]
+   (get-header req-or-resp header-name nil))
+  ([req-or-resp header-name not-found]
+   (as-> req-or-resp %
+     (find-header % header-name not-found)
+     (if (identical? % not-found) %
+         (val %)))))
 
 (defn wrap-accept
   [handler {:keys [mime charset encoding language]}]
-  (let [match*
-        (fn [offered accepts matcher-fn post-fn]
-          (match (parse-offered offered) (post-fn (parse-accepts accepts)) matcher-fn))
-        assoc-in-once
-        #(if (nil? (get-in %1 %2)) (assoc-in %1 %2 %3) %1)]
-    (fn [{headers :headers :as request}]
-      (-> request
-          (assoc-in-once [:accept :mime]     (match* mime     (headers "accept" "*/*")               mime-match  identity))
-          (assoc-in-once [:accept :charset]  (match* charset  (headers "accept-charset" "*")         exact-match charset-post))
-          (assoc-in-once [:accept :encoding] (match* encoding (headers "accept-encoding" "identity") exact-match encoding-post))
-          (assoc-in-once [:accept :language] (match* language (headers "accept-language" "*")        lang-match  lang-post))
+  (let [match* (fn [offered accepts matcher-fn post-fn]
+                 (match (parse-offered offered)
+                   (post-fn (parse-accepts accepts))
+                   matcher-fn))]
+    (fn [{headers :headers :as req}]
+      (-> req
+          (assoc-in-once [:accept :mime] (match* mime (get-header req "accept" "*/*") mime-match identity))
+          (assoc-in-once [:accept :charset] (match* charset (get-header req "accept-charset" "*") exact-match charset-post))
+          (assoc-in-once [:accept :encoding] (match* encoding (get-header req "accept-encoding" "identity") exact-match encoding-post))
+          (assoc-in-once [:accept :language] (match* language (get-header req "accept-language" "*") lang-match  lang-post))
           (handler)))))
